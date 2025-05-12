@@ -8,13 +8,7 @@ import json
 import os
 import time
 from cryptography.fernet import Fernet
-from datetime import datetime
-
-# -----------------------------
-# 📁 JSON File Handling
-# -----------------------------
-DATA_FILE = "data.json"
-LOCK_FILE = "lock.json"
+from datetime import datetime 
 USERS_FILE = "users.json"
 
 def load_data():
