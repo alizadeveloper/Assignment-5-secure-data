@@ -1,14 +1,13 @@
 import streamlit as st
-
-# ✅ This MUST be the first Streamlit command
-st.set_page_config(page_title="Secure Data Vault", page_icon="🛡️", initial_sidebar_state="collapsed")
-
 import hashlib
 import json
 import os
 import time
 from cryptography.fernet import Fernet
 from datetime import datetime
+
+# ✅ This MUST be the first Streamlit command
+st.set_page_config(page_title="Secure Data Vault", page_icon="🛡️", initial_sidebar_state="collapsed")
 
 # -----------------------------
 # 📁 JSON File Handling
@@ -61,7 +60,7 @@ def save_users(users):
 # -----------------------------
 @st.cache_resource
 def get_cipher():
-    key = Fernet.generate_key()
+    key = Fernet.generate_key()  # Generate a key for encryption
     return Fernet(key)
 
 cipher = get_cipher()
