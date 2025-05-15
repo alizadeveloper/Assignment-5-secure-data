@@ -1,6 +1,6 @@
 import streamlit as st
 
-# ✅ This must be FIRST Streamlit command
+# ✅ This MUST be the first Streamlit command
 st.set_page_config(page_title="Secure Data Vault", page_icon="🛡️", initial_sidebar_state="collapsed")
 
 import hashlib
@@ -8,7 +8,13 @@ import json
 import os
 import time
 from cryptography.fernet import Fernet
-from datetime import datetime 
+from datetime import datetime
+
+# -----------------------------
+# 📁 JSON File Handling
+# -----------------------------
+DATA_FILE = "data.json"
+LOCK_FILE = "lock.json"
 USERS_FILE = "users.json"
 
 def load_data():
@@ -63,16 +69,12 @@ cipher = get_cipher()
 # -----------------------------
 # 📆 Load Data into Session State
 # -----------------------------
-stored_data = load_data()
-locks = load_locks()
-users_data = load_users()
-
 if "stored_data" not in st.session_state:
-    st.session_state.stored_data = stored_data
+    st.session_state.stored_data = load_data()
 if "failed_attempts" not in st.session_state:
     st.session_state.failed_attempts = 0
 if "locks" not in st.session_state:
-    st.session_state.locks = locks
+    st.session_state.locks = load_locks()
 if "is_logged_in" not in st.session_state:
     st.session_state.is_logged_in = False
 if "current_user" not in st.session_state:
@@ -121,8 +123,10 @@ def decrypt_data(encrypted_text, passkey):
 # -----------------------------
 # 🔐 Auth System First
 # -----------------------------
-st.title("🛡️Secure Data Encryption System")
+st.title("🛡️ Secure Data Encryption System")
 st.caption("Developed by Aliza Naeem")
+
+users_data = load_users()
 
 if not st.session_state.is_logged_in:
     auth_tab = st.radio("Login or Register", ["Login", "Register"], horizontal=True)
@@ -139,18 +143,17 @@ if not st.session_state.is_logged_in:
                 st.session_state.current_user = user_login
                 st.success(f"✅ Welcome, {user_login}!")
                 st.balloons()
-                time.sleep(2)
-                st.session_state.page = "home"
+                time.sleep(1)
                 st.rerun()
             else:
                 st.error("❌ Incorrect username or password.")
 
     elif auth_tab == "Register":
-        st.subheader("💊 Create New Account")
+        st.subheader("🖊️ Create New Account")
         new_user = st.text_input("👤 Username")
         new_pass = st.text_input("🔑 Password", type="password")
 
-        if st.button("🖍️ Register"):
+        if st.button("📝 Register"):
             if new_user in users_data:
                 st.error("❌ Username already exists.")
             elif new_user and new_pass:
@@ -158,7 +161,7 @@ if not st.session_state.is_logged_in:
                 save_users(users_data)
                 st.success("✅ Registered successfully! You can now login.")
                 st.balloons()
-                st.session_state.page = "home"
+                time.sleep(1)
                 st.rerun()
             else:
                 st.warning("⚠️ Please enter both username and password.")
@@ -174,8 +177,7 @@ if st.session_state.is_logged_in:
         st.session_state.current_user = None
         st.success("✅ Logged out successfully.")
         st.balloons()
-        time.sleep(2)
-        st.session_state.page = "login"
+        time.sleep(1)
         st.rerun()
 
     menu = ["Home", "Store Data", "Retrieve Data", "View Entries", "Change Password", "Delete Profile"]
@@ -184,13 +186,15 @@ if st.session_state.is_logged_in:
     if choice == "Home":
         st.subheader("🏠 Welcome to Your Encrypted Vault")
         st.markdown("""
-        ... (same markdown content) ...
+        This is a secure vault for storing encrypted text using Fernet encryption.
+        - Encrypt and save secret messages.
+        - View and retrieve only with the correct passkey.
+        - 3 failed attempts locks the entry for 5 minutes.
         """)
 
     elif choice == "Store Data":
         st.subheader("📂 Store Encrypted Data")
-        username = st.session_state.current_user
-        user_data = st.text_area("🗒️ Enter Secret Data:")
+        user_data = st.text_area("📝 Enter Secret Data:")
         passkey = st.text_input("🔑 Create Passkey:", type="password")
 
         if st.button("🔐 Encrypt & Save"):
@@ -199,91 +203,76 @@ if st.session_state.is_logged_in:
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 st.session_state.stored_data[encrypted] = {
                     "passkey": hash_passkey(passkey),
-                    "user": username,
+                    "user": st.session_state.current_user,
                     "timestamp": timestamp
                 }
                 save_data(st.session_state.stored_data)
                 st.success("✅ Data encrypted and saved!")
-                st.balloons()
-                with st.expander("📆 Encrypted Text (click to view)"):
+                with st.expander("📦 Encrypted Output"):
                     st.code(encrypted, language="text")
-                st.text(f"Timestamp: {timestamp}")
             else:
-                st.error("⚠️ All fields are required!")
+                st.error("⚠️ All fields are required.")
 
     elif choice == "Retrieve Data":
         st.subheader("🔍 Retrieve Your Data")
         encrypted_input = st.text_area("🔐 Enter Encrypted Text:")
         passkey_input = st.text_input("🔑 Enter Passkey:", type="password")
 
-        if st.button("🤩 Decrypt"):
+        if st.button("🔓 Decrypt"):
             if encrypted_input and passkey_input:
                 decrypted = decrypt_data(encrypted_input, passkey_input)
                 if decrypted:
                     st.success("✅ Decrypted Data:")
-                    st.code(decrypted, language="text")
-                    st.balloons()
+                    st.code(decrypted)
                 else:
-                    attempts_left = max(0, 3 - st.session_state.failed_attempts)
                     if encrypted_input in st.session_state.locks:
-                        st.warning("🔒 Data is locked for 5 minutes or until admin login.")
+                        st.warning("🔒 Entry is locked. Wait 5 minutes.")
                     else:
+                        attempts_left = max(0, 3 - st.session_state.failed_attempts)
                         st.error(f"❌ Incorrect passkey! Attempts left: {attempts_left}")
             else:
-                st.error("⚠️ Please provide both encrypted text and passkey.")
+                st.warning("⚠️ Both fields are required.")
 
     elif choice == "View Entries":
-        st.subheader("📁 Stored Entries")
+        st.subheader("📑 Stored Entries")
         if st.session_state.stored_data:
             for i, (enc, details) in enumerate(st.session_state.stored_data.items(), 1):
                 with st.expander(f"📜 Entry {i} — {details['user']} at {details['timestamp']}"):
                     st.text(f"Encrypted: {enc}")
-                    st.text(f"User: {details['user']}")
-                    st.text(f"Stored At: {details['timestamp']}")
         else:
-            st.info("📬 No data stored yet.")
+            st.info("📭 No data found.")
 
         if st.button("🗑️ Delete All Entries"):
             st.session_state.stored_data.clear()
             save_data(st.session_state.stored_data)
-            st.success("✅ All entries have been deleted.")
-
-    elif choice == "Delete Profile":
-        st.subheader("🗑️ Delete Your Profile")
-        if st.button("Delete Profile"):
-            del users_data[st.session_state.current_user]
-            save_users(users_data)
-            st.session_state.is_logged_in = False
-            st.session_state.current_user = None
-            st.success("✅ Profile deleted successfully.")
-            st.balloons()
-            time.sleep(2)
-            st.session_state.page = "login"
-            st.rerun()
+            st.success("✅ All entries deleted.")
 
     elif choice == "Change Password":
-        st.subheader("🔒 Change Your Password")
-
-        current_pass = st.text_input("🔑 Current Password", type="password")
-        new_pass = st.text_input("🆕 New Password", type="password")
-        confirm_pass = st.text_input("✅ Confirm New Password", type="password")
+        st.subheader("🔒 Change Password")
+        current_pass = st.text_input("Current Password", type="password")
+        new_pass = st.text_input("New Password", type="password")
+        confirm_pass = st.text_input("Confirm New Password", type="password")
 
         if st.button("🔁 Update Password"):
             user = st.session_state.current_user
-            hashed_current = hash_passkey(current_pass)
-
-            if users_data.get(user) != hashed_current:
-                st.error("❌ Current password is incorrect.")
+            users_data = load_users()
+            if users_data.get(user) != hash_passkey(current_pass):
+                st.error("❌ Current password incorrect.")
             elif new_pass != confirm_pass:
-                st.warning("⚠️ New passwords do not match.")
-            elif new_pass == current_pass:
-                st.warning("⚠️ New password must be different from the current password.")
-            elif len(new_pass) < 4:
-                st.warning("⚠️ Password must be at least 4 characters long.")
+                st.warning("⚠️ Passwords don't match.")
             else:
                 users_data[user] = hash_passkey(new_pass)
                 save_users(users_data)
-                st.success("✅ Password changed successfully!")
-                st.balloons()
+                st.success("✅ Password updated.")
 
-
+    elif choice == "Delete Profile":
+        st.subheader("🗑️ Delete Your Profile")
+        if st.button("Delete My Profile"):
+            users_data = load_users()
+            if st.session_state.current_user in users_data:
+                del users_data[st.session_state.current_user]
+                save_users(users_data)
+            st.session_state.is_logged_in = False
+            st.session_state.current_user = None
+            st.success("✅ Profile deleted.")
+            st.rerun()
